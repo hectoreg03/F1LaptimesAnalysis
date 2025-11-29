@@ -9,13 +9,14 @@ from matplotlib.collections import LineCollection
 from matplotlib import colormaps
 
 # --- CONFIGURACIÓN DE ESTILO ---
-# Definimos colores oficiales para usar en las gráficas
 F1_RED = '#e10600'
-F1_BG = '#15151e' # Un gris muy oscuro, casi negro, para el fondo de las gráficas
+F1_BG = '#15151e' 
+# TAMAÑO ESTÁNDAR PARA NORMALIZAR TODAS LAS GRÁFICAS (Ancho, Alto)
+STANDARD_FIGSIZE = (13, 7)
 
 def apply_f1_style(ax, title):
     """Aplica estilos consistentes a los ejes de Matplotlib."""
-    ax.set_title(title, color='white', fontsize=16, fontweight='bold', pad=20)
+    ax.set_title(title, color='white', fontsize=18, fontweight='bold', pad=20)
     ax.set_xlabel(ax.get_xlabel(), color='white', fontsize=12)
     ax.set_ylabel(ax.get_ylabel(), color='white', fontsize=12)
     ax.tick_params(colors='white', which='both', labelsize=10)
@@ -36,26 +37,26 @@ def get_speed_map(session, driver):
         segments = np.concatenate([points[:-1], points[1:]], axis=1)
         speed = tel['Speed']
 
-        fig, ax = plt.subplots(figsize=(10, 6))
+        # Usamos el tamaño estándar
+        fig, ax = plt.subplots(figsize=STANDARD_FIGSIZE)
         fig.patch.set_facecolor(F1_BG)
         
         cmap = plt.get_cmap('plasma')
         norm = plt.Normalize(speed.min(), speed.max())
-        lc = LineCollection(segments, cmap=cmap, norm=norm, linestyle='-', linewidth=5)
+        lc = LineCollection(segments, cmap=cmap, norm=norm, linestyle='-', linewidth=6)
         lc.set_array(speed)
         line = ax.add_collection(lc)
         
-        # Pista de fondo
-        ax.plot(x, y, color='#333333', linestyle='-', linewidth=12, zorder=0)
+        ax.plot(x, y, color='#333333', linestyle='-', linewidth=14, zorder=0)
 
-        cbar = plt.colorbar(line, ax=ax, orientation='vertical')
+        cbar = plt.colorbar(line, ax=ax, orientation='vertical', pad=0.02)
         cbar.set_label('Velocidad (km/h)', color='white')
         cbar.ax.yaxis.set_tick_params(color='white')
         plt.setp(plt.getp(cbar.ax.axes, 'yticklabels'), color='white')
 
         ax.axis('off')
         ax.set_aspect('equal')
-        ax.set_title(f"Speed Map - {driver}", color='white', fontweight='bold', fontsize=14)
+        ax.set_title(f"Speed Map - {driver}", color='white', fontweight='bold', fontsize=18, pad=20)
         return fig
     except Exception as e:
         return None
@@ -70,26 +71,26 @@ def get_gear_map(session, driver):
         segments = np.concatenate([points[:-1], points[1:]], axis=1)
         gear = tel['nGear'].to_numpy().astype(float)
 
-        fig, ax = plt.subplots(figsize=(10, 6))
+        fig, ax = plt.subplots(figsize=STANDARD_FIGSIZE)
         fig.patch.set_facecolor(F1_BG)
 
         cmap = colormaps['Paired']
         lc_comp = LineCollection(segments, norm=plt.Normalize(1, cmap.N+1), cmap=cmap)
         lc_comp.set_array(gear)
-        lc_comp.set_linewidth(4)
+        lc_comp.set_linewidth(5)
         ax.add_collection(lc_comp)
         
         ax.axis('equal')
         ax.axis('off')
 
-        cbar = plt.colorbar(mappable=lc_comp, ax=ax, boundaries=np.arange(1, 10))
+        cbar = plt.colorbar(mappable=lc_comp, ax=ax, boundaries=np.arange(1, 10), pad=0.02)
         cbar.set_ticks(np.arange(1.5, 9.5))
         cbar.set_ticklabels(np.arange(1, 9))
         cbar.set_label('Marcha', color='white')
         cbar.ax.yaxis.set_tick_params(color='white')
         plt.setp(plt.getp(cbar.ax.axes, 'yticklabels'), color='white')
         
-        ax.set_title(f"Gear Shift Map - {driver}", color='white', fontweight='bold', fontsize=14)
+        ax.set_title(f"Gear Shift Map - {driver}", color='white', fontweight='bold', fontsize=18, pad=20)
         return fig
     except Exception as e:
         return None
@@ -105,18 +106,17 @@ def get_driver_laptimes(session, driver):
         driver_laps.loc[~pd.isnull(driver_laps['PitInTime']), 'LapStatus'] = 'Pitstop'
         driver_laps.loc[~pd.isnull(driver_laps['PitOutTime']), 'LapStatus'] = 'Pitstop'
 
-        fig, ax = plt.subplots(figsize=(10, 6))
+        fig, ax = plt.subplots(figsize=STANDARD_FIGSIZE)
         fig.patch.set_facecolor(F1_BG)
         
         sns.scatterplot(data=driver_laps, x="LapNumber", y="LapTime", ax=ax,
                         hue="Compound", palette=fastf1.plotting.get_compound_mapping(session=session),
                         style="LapStatus", markers={'Ritmo': 'o', 'Pitstop': 'X', 'Lluvia': 'D'},
-                        s=80, linewidth=0, legend='auto')
+                        s=120, linewidth=0, legend='auto')
 
         ax.invert_yaxis()
         apply_f1_style(ax, f"Lap Time Evolution - {driver}")
         
-        # Leyenda limpia
         ax.legend(frameon=True, facecolor=F1_BG, edgecolor='white', labelcolor='white', loc='upper right')
         return fig
     except Exception as e:
@@ -131,7 +131,7 @@ def get_lap_distribution(session):
         finishing_order = [session.get_driver(i)["Abbreviation"] for i in point_finishers]
         driver_laps["LapTime(s)"] = driver_laps["LapTime"].dt.total_seconds()
 
-        fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax = plt.subplots(figsize=STANDARD_FIGSIZE)
         fig.patch.set_facecolor(F1_BG)
 
         sns.violinplot(data=driver_laps, x="Driver", y="LapTime(s)", hue="Driver",
@@ -142,7 +142,7 @@ def get_lap_distribution(session):
         sns.swarmplot(data=driver_laps, x="Driver", y="LapTime(s)", order=finishing_order,
                       hue="Compound", palette=fastf1.plotting.get_compound_mapping(session=session),
                       hue_order=["SOFT", "MEDIUM", "HARD", "INTERMEDIATE", "WET"],
-                      linewidth=0, size=3, ax=ax)
+                      linewidth=0, size=4, ax=ax)
         
         apply_f1_style(ax, "Top 10 Pace Distribution")
         ax.set_xlabel("")
@@ -158,7 +158,8 @@ def get_strategy_chart(session):
         stints = stints.rename(columns={"LapNumber": "StintLength"})
         drivers_ordered = [session.get_driver(d)["Abbreviation"] for d in session.drivers]
 
-        fig, ax = plt.subplots(figsize=(8, 10))
+        # Cambiado a STANDARD_FIGSIZE para que sea ancho en lugar de alto y estrecho
+        fig, ax = plt.subplots(figsize=STANDARD_FIGSIZE)
         fig.patch.set_facecolor(F1_BG)
         ax.set_facecolor(F1_BG)
         
@@ -180,7 +181,8 @@ def get_strategy_chart(session):
 
 def get_position_changes(session, highlight_driver):
     try:
-        fig, ax = plt.subplots(figsize=(8, 10))
+        # Cambiado a STANDARD_FIGSIZE
+        fig, ax = plt.subplots(figsize=STANDARD_FIGSIZE)
         fig.patch.set_facecolor(F1_BG)
         ax.set_facecolor(F1_BG)
 
@@ -192,7 +194,6 @@ def get_position_changes(session, highlight_driver):
             if abb == highlight_driver:
                 style = fastf1.plotting.get_driver_style(identifier=abb, style=['color', 'linestyle'], session=session)
                 alpha, lw, zorder = 1.0, 4, 10
-                # Añadir un borde blanco al piloto seleccionado para contraste
                 ax.plot(drv_laps['LapNumber'], drv_laps['Position'], color='white', linewidth=6, zorder=9, alpha=0.5)
             else:
                 style = fastf1.plotting.get_driver_style(identifier=abb, style=['color', 'linestyle'], session=session)
@@ -215,7 +216,7 @@ def get_team_pace(session):
         team_order = (transformed_laps[["Team", "LapTime (s)"]].groupby("Team").median()["LapTime (s)"].sort_values().index)
         team_palette = {team: fastf1.plotting.get_team_color(team, session=session) for team in team_order}
 
-        fig, ax = plt.subplots(figsize=(10, 6))
+        fig, ax = plt.subplots(figsize=STANDARD_FIGSIZE)
         fig.patch.set_facecolor(F1_BG)
         
         sns.boxplot(data=transformed_laps, x="Team", y="LapTime (s)",
@@ -251,7 +252,7 @@ def get_driver_weekend_laptimes(current_session, driver):
         if not all_laps_list: return None
         weekend_df = pd.concat(all_laps_list)
 
-        fig, ax = plt.subplots(figsize=(12, 7))
+        fig, ax = plt.subplots(figsize=STANDARD_FIGSIZE)
         fig.patch.set_facecolor(F1_BG)
 
         sns.violinplot(data=weekend_df, x='Session', y='LapTimeSeconds',
@@ -269,8 +270,8 @@ def get_driver_weekend_laptimes(current_session, driver):
         return None
 
 def get_race_replay(session):
+    # La altura se controla directamente en Plotly, 700px es un buen balance
     try:
-        # Nota: Plotly tiene su propio sistema de temas, lo configuraremos en el layout
         laps = session.laps.pick_drivers(session.drivers).reset_index()
         laps = laps.dropna(subset=['Time', 'LapNumber', 'LapTime'])
         laps['EndTime'] = laps['Time'].dt.total_seconds()
@@ -321,15 +322,14 @@ def get_race_replay(session):
         fig = px.bar(
             df_anim, x="Progress", y="Rank", animation_frame="TimeIndex", animation_group="Driver",
             orientation='h', text="Driver", color="Team", color_discrete_map=color_map,
-            range_x=[0, laps['LapNumber'].max() + 0.5], range_y=[20.5, 0.5], height=600
+            range_x=[0, laps['LapNumber'].max() + 0.5], range_y=[20.5, 0.5], height=700
         )
         
-        # Tema Oscuro Plotly
         fig.update_layout(
             title="🏁 Race Replay",
             plot_bgcolor=F1_BG,
             paper_bgcolor=F1_BG,
-            font=dict(color='white', family="Arial"), # Arial es segura y limpia
+            font=dict(color='white', family="Arial"),
             xaxis=dict(title="Laps", gridcolor='#333', showgrid=True),
             yaxis=dict(title="Position", autorange="reversed", showgrid=False),
             showlegend=False,
