@@ -23,20 +23,51 @@ st.markdown("""
         font-family: 'Titillium Web', sans-serif;
     }
     
-    /* --- BARRA LATERAL --- */
+    /* --- BARRA LATERAL (SIDEBAR) --- */
     section[data-testid="stSidebar"] {
         background-color: #1b1b26;
         border-right: 2px solid #e10600;
     }
+
+    /* === FORZAR BLANCO EN BARRA LATERAL === */
     
-    /* CORRECCIÓN: Texto blanco en la barra lateral */
-    section[data-testid="stSidebar"] p, 
-    section[data-testid="stSidebar"] span, 
-    section[data-testid="stSidebar"] label {
+    /* 1. Textos generales y Títulos (Markdown) */
+    section[data-testid="stSidebar"] h1, 
+    section[data-testid="stSidebar"] h2, 
+    section[data-testid="stSidebar"] h3, 
+    section[data-testid="stSidebar"] p,
+    section[data-testid="stSidebar"] li {
         color: #ffffff !important;
     }
 
-    /* Encabezados */
+    /* 2. Etiquetas de Inputs (Labels encima de los selectores) */
+    section[data-testid="stSidebar"] .stMultiSelect label p,
+    section[data-testid="stSidebar"] .stSelectbox label p,
+    section[data-testid="stSidebar"] .stTextInput label p,
+    section[data-testid="stSidebar"] .stNumberInput label p {
+        color: #ffffff !important;
+        font-weight: 700;
+        font-size: 14px;
+    }
+
+    /* 3. Opciones de Radio Button (El menú de navegación) */
+    section[data-testid="stSidebar"] .stRadio label p {
+        color: #ffffff !important;
+        font-size: 16px;
+    }
+
+    /* 4. Texto INTERNO de los Selectbox (Lo que seleccionas) */
+    section[data-testid="stSidebar"] div[data-baseweb="select"] span,
+    section[data-testid="stSidebar"] div[data-baseweb="select"] div {
+        color: #ffffff !important;
+    }
+    
+    /* 5. Iconos de flechitas en los dropdowns */
+    section[data-testid="stSidebar"] svg {
+        fill: #ffffff !important;
+    }
+
+    /* --- ESTILOS GENERALES --- */
     h1 {
         font-family: 'Titillium Web', sans-serif;
         font-weight: 700;
@@ -51,13 +82,6 @@ st.markdown("""
         font-weight: 600;
         color: #f0f0f0;
         text-transform: uppercase;
-    }
-    
-    /* Etiquetas de Widgets (Inputs) */
-    div[data-testid="stWidgetLabel"] p {
-        color: #ffffff !important;
-        font-weight: 600;
-        font-size: 1rem;
     }
 
     /* Botones */
@@ -108,6 +132,11 @@ st.markdown("""
         border-left: 5px solid #e10600;
         margin-bottom: 20px;
     }
+    
+    /* Forzar texto blanco dentro de la tarjeta de proyecto */
+    .project-card p, .project-card h3 {
+        color: white !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -131,7 +160,7 @@ if page == "🏠 Project Overview":
     st.markdown("""
     <div class="project-card">
         <h3>📊 About the Project</h3>
-        <p style="color: white;">This application is an advanced telemetry analysis tool designed to visualize Formula 1 data using the 
+        <p>This application is an advanced telemetry analysis tool designed to visualize Formula 1 data using the 
         official <b>FastF1</b> library. It allows users to explore race dynamics, tyre strategies, and driver performance 
         through interactive dashboards.</p>
     </div>
