@@ -417,32 +417,20 @@ def get_race_replay(session):
     except Exception as e:
         return None
 
-def get_race_conditions_chart(session):
-    """
-    Genera un gráfico combinado de:
-    1. Temperatura de Pista y Aire (Líneas)
-    2. Humedad (Línea secundaria)
-    3. Lluvia (Marcadores)
-    4. Banderas (Fondo de color según Safety Car, VSC, Red Flag)
-    """
+def get_weather_chart(session):
     try:
-        # 1. Preparar Datos
         laps = session.laps
         weather = session.weather_data
         
-        # Usamos al ganador como referencia de "Vueltas de Carrera"
         winner_id = session.drivers[0]
         winner_laps = session.laps.pick_drivers(winner_id).reset_index()
         
-        lap_conditions = []
-        
+        lap_weather = []
         for i, row in winner_laps.iterrows():
             lap_num = row['LapNumber']
-            # FastF1 a veces no tiene LapStartTime directo en versiones viejas, lo calculamos
             end_t = row['Time']
             start_t = end_t - row['LapTime'] if pd.notnull(row['LapTime']) else end_t
             
-            # Filtrar clima en esa ventana de tiempo
             mask = (weather['Time'] >= start_t) & (weather['Time'] <= end_t)
             w_segment = weather[mask]
             
@@ -451,88 +439,212 @@ def get_race_conditions_chart(session):
                 avg_track = w_segment['TrackTemp'].mean()
                 avg_humid = w_segment['Humidity'].mean()
                 rain = w_segment['Rainfall'].any()
-            else:
-                avg_air, avg_track, avg_humid, rain = np.nan, np.nan, np.nan, False
-                
-            # Estado de Pista (Banderas)
-            # TrackStatus es un string ej: '1', '2', '24'
-            status_code = str(row['TrackStatus'])
-            status = 'Green'
-            if '5' in status_code: status = 'Red'       # Bandera Roja
-            elif '4' in status_code: status = 'SC'      # Safety Car
-            elif '6' in status_code or '7' in status_code: status = 'VSC' # VSC
-            elif '2' in status_code: status = 'Yellow'  # Amarilla
-            
-            lap_conditions.append({
-                'Lap': lap_num,
-                'AirTemp': avg_air,
-                'TrackTemp': avg_track,
-                'Humidity': avg_humid,
-                'Rain': rain,
-                'Status': status
-            })
-            
-        df_cond = pd.DataFrame(lap_conditions)
+                lap_weather.append({'Lap': lap_num, 'Air': avg_air, 'Track': avg_track, 'Hum': avg_humid, 'Rain': rain})
         
-        # 2. Plotting
+        df_w = pd.DataFrame(lap_weather)
+        
         fig, ax1 = plt.subplots(figsize=STANDARD_FIGSIZE)
         fig.patch.set_facecolor(F1_BG)
         ax1.set_facecolor(F1_BG)
         
-        # Líneas de Temperatura
-        l1, = ax1.plot(df_cond['Lap'], df_cond['TrackTemp'], color='#e10600', label='Track Temp (°C)', linewidth=3)
-        l2, = ax1.plot(df_cond['Lap'], df_cond['AirTemp'], color='#ff8000', label='Air Temp (°C)', linewidth=2, linestyle='--')
+        l1, = ax1.plot(df_w['Lap'], df_w['Track'], color='#e10600', label='Track Temp (°C)', linewidth=3)
+        l2, = ax1.plot(df_w['Lap'], df_w['Air'], color='#ff8000', label='Air Temp (°C)', linewidth=2, linestyle='--')
         
         ax1.set_xlabel('Lap Number', color='white')
         ax1.set_ylabel('Temperature (°C)', color='white')
         
-        # Eje Secundario para Humedad
         ax2 = ax1.twinx()
-        l3, = ax2.plot(df_cond['Lap'], df_cond['Humidity'], color='#00aaff', label='Humidity (%)', linewidth=2, alpha=0.7)
+        l3, = ax2.plot(df_w['Lap'], df_w['Hum'], color='#00aaff', label='Humidity (%)', linewidth=2, alpha=0.7)
         ax2.set_ylabel('Humidity (%)', color='#00aaff')
         ax2.tick_params(axis='y', colors='#00aaff')
         ax2.spines['top'].set_visible(False)
         ax2.spines['bottom'].set_visible(False)
         ax2.spines['left'].set_visible(False)
         
-        # Marcadores de Lluvia
-        rain_laps = df_cond[df_cond['Rain'] == True]
+        rain_laps = df_w[df_w['Rain'] == True]
         if not rain_laps.empty:
-            # Ponemos los marcadores un poco arriba del max track temp
-            y_rain_marker = df_cond['TrackTemp'].max() + 2
-            ax1.scatter(rain_laps['Lap'], [y_rain_marker] * len(rain_laps), 
-                        color='#00aaff', marker='v', s=100, label='Rain Detected', zorder=10)
+            y_marker = df_w['Track'].max() + 1
+            ax1.scatter(rain_laps['Lap'], [y_marker]*len(rain_laps), color='#00aaff', marker='v', s=100, zorder=10)
 
-        # Fondos de Banderas (Spans)
-        # Iteramos y dibujamos franjas verticales
-        for idx, row in df_cond.iterrows():
-            color = None
-            if row['Status'] == 'SC': color = '#ffa500'   # Naranja SC
-            elif row['Status'] == 'VSC': color = '#ffd700' # Oro VSC
-            elif row['Status'] == 'Red': color = '#ff0000' # Rojo
-            elif row['Status'] == 'Yellow': color = '#ffff00' # Amarillo
-            
-            if color:
-                ax1.axvspan(row['Lap']-0.5, row['Lap']+0.5, color=color, alpha=0.15, lw=0)
-
-        # Leyenda Unificada
         lines = [l1, l2, l3]
-        labels = [l.get_label() for l in lines]
-        # Añadir leyenda de lluvia si existe
-        if not rain_laps.empty:
-            # Truco para añadir el scatter a la leyenda
-            rain_proxy = plt.Line2D([0], [0], linestyle="none", marker='v', color='#00aaff', markersize=10)
-            lines.append(rain_proxy)
-            labels.append("Rain")
-            
-        ax1.legend(lines, labels, loc='upper left', frameon=True, facecolor=F1_BG, labelcolor='white')
+        ax1.legend(lines, [l.get_label() for l in lines], loc='upper left', frameon=True, facecolor=F1_BG, labelcolor='white')
         
-        apply_f1_style(ax1, "Race Conditions (Weather & Flags)")
-        # Desactivar grid para limpieza visual ya que tenemos fondos de colores
-        ax1.grid(False) 
+        apply_f1_style(ax1, "Track Weather Conditions")
+        ax1.grid(True, alpha=0.2)
+        return fig
+    except: return None
+
+def get_flag_laps_chart(session):
+    try:
+        winner_id = session.drivers[0]
+        laps = session.laps.pick_drivers(winner_id).reset_index()
+        
+        status_data = []
+        for i, row in laps.iterrows():
+            raw_status = str(row['TrackStatus'])
+            val = 0
+            color = 'green'
+            label = 'Green'
+            
+            if '5' in raw_status: val=3; color='red'; label='Red Flag'
+            elif '4' in raw_status: val=2; color='orange'; label='Safety Car'
+            elif '6' in raw_status or '7' in raw_status: val=1.5; color='gold'; label='VSC'
+            elif '2' in raw_status: val=1; color='yellow'; label='Yellow'
+            
+            status_data.append({'Lap': row['LapNumber'], 'Val': val, 'Color': color, 'Label': label})
+            
+        df_s = pd.DataFrame(status_data)
+        
+        fig, ax = plt.subplots(figsize=(13, 4))
+        fig.patch.set_facecolor(F1_BG)
+        ax.set_facecolor(F1_BG)
+        
+        ax.step(df_s['Lap'], df_s['Val'], where='post', color='white', linewidth=1, alpha=0.5)
+        
+        for idx, row in df_s.iterrows():
+             ax.bar(row['Lap'], row['Val'], width=1, color=row['Color'], align='edge', alpha=0.8)
+
+        ax.set_yticks([0, 1, 1.5, 2, 3])
+        ax.set_yticklabels(['Green', 'Yellow', 'VSC', 'SC', 'Red'], color='white')
+        ax.set_ylim(0, 3.5)
+        
+        apply_f1_style(ax, "Race Control Status")
+        return fig
+    except: return None
+
+def get_tyre_performance_analysis(session, driver):
+    try:
+        laps = session.laps.pick_drivers(driver).pick_quicklaps().reset_index()
+        laps['LapTimeSeconds'] = laps['LapTime'].dt.total_seconds()
+        
+        fig, ax = plt.subplots(figsize=STANDARD_FIGSIZE)
+        fig.patch.set_facecolor(F1_BG)
+        ax.set_facecolor(F1_BG)
+        
+        sns.boxplot(data=laps, x='Compound', y='LapTimeSeconds', hue='Compound',
+                    palette=fastf1.plotting.get_compound_mapping(session=session),
+                    ax=ax, linewidth=1.5)
+        
+        sns.swarmplot(data=laps, x='Compound', y='LapTimeSeconds', color='white', alpha=0.6, size=4, ax=ax)
+        
+        apply_f1_style(ax, f"Tyre Performance Analysis - {driver}")
+        ax.set_ylabel("Lap Time (s)", color='white')
+        ax.set_xlabel("Compound", color='white')
         
         return fig
+    except: return None
 
+def get_top_speeds(session):
+    try:
+        drivers = session.drivers
+        max_speeds = []
+        
+        for d in drivers:
+            try:
+                fastest = session.laps.pick_drivers(d).pick_fastest()
+                tel = fastest.get_telemetry()
+                max_spd = tel['Speed'].max()
+                team = session.get_driver(d)['TeamName']
+                max_speeds.append({'Driver': d, 'Speed': max_spd, 'Team': team})
+            except: continue
+            
+        df_speed = pd.DataFrame(max_speeds).sort_values('Speed', ascending=False)
+        
+        fig, ax = plt.subplots(figsize=STANDARD_FIGSIZE)
+        fig.patch.set_facecolor(F1_BG)
+        ax.set_facecolor(F1_BG)
+        
+        bars = ax.bar(df_speed['Driver'], df_speed['Speed'], color=F1_RED)
+        
+        for i, bar in enumerate(bars):
+            team_name = df_speed.iloc[i]['Team']
+            try:
+                col = fastf1.plotting.get_team_color(team_name, session=session)
+                bar.set_color(col)
+            except: pass
+            
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height,
+                    f'{int(height)}', ha='center', va='bottom', color='white', fontweight='bold')
+
+        apply_f1_style(ax, "Top Speeds (Speed Trap)")
+        ax.set_ylim(df_speed['Speed'].min() - 10, df_speed['Speed'].max() + 5)
+        ax.set_ylabel("Speed (km/h)", color='white')
+        
+        return fig
+    except: return None
+
+def get_best_sectors(session):
+    """
+    Genera una figura con 3 subplots mostrando los mejores tiempos de Sector 1, 2 y 3
+    para los top 10 pilotos.
+    """
+    try:
+        # 1. Obtener datos
+        # Usamos todas las vueltas válidas, no solo quicklaps, para encontrar sectores récord incluso en vueltas abortadas
+        laps = session.laps.dropna(subset=['Sector1Time', 'Sector2Time', 'Sector3Time'])
+        
+        drivers = session.drivers
+        best_sectors = []
+        
+        for d in drivers:
+            d_laps = laps.pick_drivers(d)
+            if d_laps.empty: continue
+            
+            # Obtener el mínimo de cada sector
+            s1 = d_laps['Sector1Time'].min().total_seconds()
+            s2 = d_laps['Sector2Time'].min().total_seconds()
+            s3 = d_laps['Sector3Time'].min().total_seconds()
+            
+            team = session.get_driver(d)['TeamName']
+            best_sectors.append({'Driver': d, 'S1': s1, 'S2': s2, 'S3': s3, 'Team': team})
+            
+        df_sectors = pd.DataFrame(best_sectors)
+        if df_sectors.empty: return None
+
+        # 2. Plotting (1 fila, 3 columnas)
+        fig, axes = plt.subplots(1, 3, figsize=STANDARD_FIGSIZE, sharey=False)
+        fig.patch.set_facecolor(F1_BG)
+        
+        sectors = ['S1', 'S2', 'S3']
+        titles = ['Sector 1', 'Sector 2', 'Sector 3']
+        
+        for i, ax in enumerate(axes):
+            ax.set_facecolor(F1_BG)
+            
+            # Ordenar y tomar top 10 más rápidos en ESE sector
+            df_sorted = df_sectors.sort_values(sectors[i]).head(10)
+            
+            bars = ax.bar(df_sorted['Driver'], df_sorted[sectors[i]], color=F1_RED)
+            
+            # Colorear por equipo
+            for j, bar in enumerate(bars):
+                team_name = df_sorted.iloc[j]['Team']
+                try:
+                    col = fastf1.plotting.get_team_color(team_name, session=session)
+                    bar.set_color(col)
+                except: pass
+            
+            # Zoom dinámico en eje Y para ver diferencias
+            min_val = df_sorted[sectors[i]].min()
+            max_val = df_sorted[sectors[i]].max()
+            # Margen pequeño
+            ax.set_ylim(min_val - 0.5, max_val + 0.5)
+            
+            # Estilos
+            ax.set_title(titles[i], color='white', fontweight='bold', fontsize=14)
+            ax.tick_params(colors='white', axis='x', rotation=45, labelsize=9)
+            ax.tick_params(colors='white', axis='y', labelsize=9)
+            ax.spines['bottom'].set_color('white')
+            ax.spines['left'].set_color('white')
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.grid(axis='y', linestyle=':', alpha=0.3)
+
+        plt.suptitle("Best Sector Times (Top 10 Drivers)", color='white', fontsize=20, fontweight='bold', y=0.98)
+        plt.tight_layout()
+        return fig
+        
     except Exception as e:
-        print(f"Error en condiciones: {e}")
+        print(f"Error sectors: {e}")
         return None
