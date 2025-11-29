@@ -29,6 +29,34 @@ st.markdown("""
         border-right: 2px solid #e10600;
     }
 
+/* === FORZAR BLANCO EN BARRA LATERAL === */
+    
+    /* 1. Textos generales y Títulos (Markdown) */
+    section[data-testid="stSidebar"] h1, 
+    section[data-testid="stSidebar"] h2, 
+    section[data-testid="stSidebar"] h3, 
+    section[data-testid="stSidebar"] p,
+    section[data-testid="stSidebar"] li {
+        color: #ffffff !important;
+    }
+
+    /* 2. Etiquetas de Inputs (Labels encima de los selectores) */
+    section[data-testid="stSidebar"] .stMultiSelect label p,
+    section[data-testid="stSidebar"] .stSelectbox label p,
+    section[data-testid="stSidebar"] .stTextInput label p,
+    section[data-testid="stSidebar"] .stNumberInput label p {
+        color: #ffffff !important;
+        font-weight: 700;
+        font-size: 14px;
+    }
+
+      /* 3. Opciones de Radio Button (El menú de navegación) */
+    section[data-testid="stSidebar"] .stRadio label p {
+        color: #ffffff !important;
+        font-size: 16px;
+    }
+
+
     /* --- ESTILOS GENERALES --- */
     h1 {
         font-family: 'Titillium Web', sans-serif;
