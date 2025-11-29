@@ -29,7 +29,7 @@ st.markdown("""
         border-right: 2px solid #e10600;
     }
 
-/* === FORZAR BLANCO EN BARRA LATERAL === */
+    /* === FORZAR BLANCO EN BARRA LATERAL (Tus Agregados) === */
     
     /* 1. Textos generales y Títulos (Markdown) */
     section[data-testid="stSidebar"] h1, 
@@ -50,14 +50,13 @@ st.markdown("""
         font-size: 14px;
     }
 
-      /* 3. Opciones de Radio Button (El menú de navegación) */
+    /* 3. Opciones de Radio Button (El menú de navegación) */
     section[data-testid="stSidebar"] .stRadio label p {
         color: #ffffff !important;
         font-size: 16px;
     }
 
-
-    /* --- ESTILOS GENERALES --- */
+    /* --- ESTILOS GENERALES DEL RESTO DE LA APP --- */
     h1 {
         font-family: 'Titillium Web', sans-serif;
         font-weight: 700;
@@ -74,7 +73,7 @@ st.markdown("""
         text-transform: uppercase;
     }
 
-    /* Etiquetas de Widgets (Inputs) - Mantenemos esto legible pero no forzamos todo lo demás */
+    /* Etiquetas de Widgets (Inputs) en el cuerpo principal */
     div[data-testid="stWidgetLabel"] p {
         color: #ffffff !important;
         font-weight: 600;
@@ -258,12 +257,13 @@ elif page == "🏁 Telemetry Dashboard":
         """, unsafe_allow_html=True)
 
         # --- TABS (LAYOUT HORIZONTAL ÚNICO) ---
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
             "TRACK DATA", 
             "LAP ANALYSIS", 
             "STRATEGY",
             "WEEKEND",
-            "REPLAY"
+            "REPLAY",
+            "CONDITIONS"
         ])
 
         # TAB 1: MAPAS
@@ -332,6 +332,18 @@ elif page == "🏁 Telemetry Dashboard":
                         if fig: st.plotly_chart(fig, use_container_width=True)
             else:
                 st.warning("Replay available for Race sessions only.")
+
+        # TAB 6: CONDITIONS
+        with tab6:
+            st.markdown("#### RACE CONDITIONS (WEATHER & FLAGS)")
+            st.caption("Analysis of track temperature, humidity, rain events, and safety car periods.")
+            
+            # Chequeo si hay datos de clima
+            if hasattr(session, 'weather_data') and not session.weather_data.empty:
+                 fig = f1.get_race_conditions_chart(session)
+                 if fig: st.pyplot(fig, use_container_width=True)
+            else:
+                 st.warning("Weather data not available for this session.")
 
     else:
         st.markdown("""
