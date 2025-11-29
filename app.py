@@ -15,47 +15,37 @@ st.set_page_config(
 # --- ESTILOS CSS F1 THEMATIC ---
 st.markdown("""
 <style>
-    /* Importar fuente similar a la oficial de F1 */
     @import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@400;600;700&display=swap');
 
-    /* Fondo general */
     .stApp {
         background-color: #15151e;
         color: white;
         font-family: 'Titillium Web', sans-serif;
     }
-
-    /* Sidebar */
     section[data-testid="stSidebar"] {
         background-color: #1b1b26;
         border-right: 2px solid #e10600;
     }
-
-    /* Encabezados Principales (H1) */
     h1 {
         font-family: 'Titillium Web', sans-serif;
         font-weight: 700;
         text-transform: uppercase;
         color: white;
-        border-bottom: 4px solid #e10600; /* Borde rojo F1 */
+        border-bottom: 4px solid #e10600;
         padding-bottom: 10px;
         letter-spacing: 1px;
     }
-
-    /* Subtítulos (H2, H3) */
-    h2, h3 {
+    h2, h3, h4 {
         font-family: 'Titillium Web', sans-serif;
         font-weight: 600;
         color: #f0f0f0;
         text-transform: uppercase;
     }
-
-    /* Botones Estilo F1 */
     div.stButton > button {
         background-color: #e10600;
         color: white;
         border: none;
-        border-radius: 5px 15px 5px 15px; /* Bordes asimétricos estilo F1 */
+        border-radius: 5px 15px 5px 15px;
         font-weight: bold;
         text-transform: uppercase;
         letter-spacing: 1px;
@@ -65,8 +55,6 @@ st.markdown("""
         background-color: #ff1801;
         border: 1px solid white;
     }
-
-    /* Pestañas */
     .stTabs [data-baseweb="tab-list"] {
         gap: 10px;
     }
@@ -81,14 +69,10 @@ st.markdown("""
         background-color: #e10600 !important;
         color: white !important;
     }
-
-    /* Métricas y Cajas */
     div[data-testid="stMetricValue"] {
         font-family: 'Titillium Web', sans-serif;
         color: #e10600;
     }
-    
-    /* Ajustes generales */
     .block-container {
         padding-top: 2rem;
     }
@@ -110,10 +94,8 @@ with col_title:
 # --- BARRA LATERAL ---
 st.sidebar.markdown("## ⚙️ RACE CONTROL")
 
-# A. Selección de Año
 year = st.sidebar.selectbox("Season", [2024, 2023, 2022, 2021], index=0)
 
-# B. Calendario
 @st.cache_data
 def get_schedule(y):
     return fastf1.get_event_schedule(y, include_testing=False)
@@ -121,12 +103,9 @@ def get_schedule(y):
 try:
     schedule = get_schedule(year)
     event_options = schedule['EventName'].tolist()
-    
-    # Encontrar la próxima carrera o la última por defecto
     default_ix = len(event_options) - 1 if len(event_options) > 0 else 0
     selected_event_name = st.sidebar.selectbox("Grand Prix", event_options, index=default_ix)
     
-    # C. Sesión
     session_map = {'R': 'Race', 'Q': 'Qualifying', 'S': 'Sprint', 'FP1': 'Practice 1', 'FP2': 'Practice 2'}
     session_key = st.sidebar.selectbox("Session", list(session_map.keys()), format_func=lambda x: session_map[x])
 
@@ -154,17 +133,14 @@ if load_btn:
 if st.session_state['session'] is not None:
     session = st.session_state['session']
     
-    # Header de la Sesión
     st.markdown(f"### 🏁 {session.event['EventName'].upper()} - {year}")
     
-    # Selector de Piloto
     drivers = session.drivers
     driver_list = [session.get_driver(d)['Abbreviation'] for d in drivers]
     
     st.sidebar.markdown("## 🏎️ DRIVER SELECT")
     selected_driver = st.sidebar.selectbox("Select Driver", driver_list, index=0)
     
-    # Información rápida del piloto
     d_info = session.get_driver(selected_driver)
     st.sidebar.markdown(f"""
     <div style='background-color: #2b2b3b; padding: 10px; border-radius: 5px; border-left: 4px solid #{d_info.TeamColor if d_info.TeamColor else 'fff'};'>
@@ -173,7 +149,7 @@ if st.session_state['session'] is not None:
     </div>
     """, unsafe_allow_html=True)
 
-    # --- TABS ---
+    # --- TABS (LAYOUT HORIZONTAL ÚNICO) ---
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "TRACK DATA", 
         "LAP ANALYSIS", 
@@ -184,44 +160,45 @@ if st.session_state['session'] is not None:
 
     # TAB 1: MAPAS
     with tab1:
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("#### SPEED TRAP")
-            fig = f1.get_speed_map(session, selected_driver)
-            if fig: st.pyplot(fig)
+        st.markdown("#### SPEED TRAP VISUALIZATION")
+        fig = f1.get_speed_map(session, selected_driver)
+        if fig: st.pyplot(fig, use_container_width=True)
         
-        with col2:
-            st.markdown("#### GEAR SHIFTS")
-            fig = f1.get_gear_map(session, selected_driver)
-            if fig: st.pyplot(fig)
+        st.divider() # Línea de separación limpia
+        
+        st.markdown("#### GEAR SHIFTS ANALYSIS")
+        fig = f1.get_gear_map(session, selected_driver)
+        if fig: st.pyplot(fig, use_container_width=True)
 
     # TAB 2: TIEMPOS
     with tab2:
         st.markdown("#### PACE DISTRIBUTION (TOP 10)")
         fig = f1.get_lap_distribution(session)
-        if fig: st.pyplot(fig)
+        if fig: st.pyplot(fig, use_container_width=True)
+        
+        st.divider()
         
         st.markdown(f"#### LAP EVOLUTION: {selected_driver}")
         fig = f1.get_driver_laptimes(session, selected_driver)
-        if fig: st.pyplot(fig)
+        if fig: st.pyplot(fig, use_container_width=True)
 
         if session_key == 'R':
+            st.divider()
             st.markdown("#### TEAM RACE PACE")
             fig = f1.get_team_pace(session)
-            if fig: st.pyplot(fig)
+            if fig: st.pyplot(fig, use_container_width=True)
 
     # TAB 3: ESTRATEGIA
     with tab3:
-        colA, colB = st.columns([1, 1])
-        with colA:
-            st.markdown("#### TYRE STRATEGY")
-            fig = f1.get_strategy_chart(session)
-            if fig: st.pyplot(fig)
+        st.markdown("#### TYRE STRATEGY OVERVIEW")
+        fig = f1.get_strategy_chart(session)
+        if fig: st.pyplot(fig, use_container_width=True)
         
-        with colB:
-            st.markdown(f"#### POSITION TRACKER: {selected_driver}")
-            fig = f1.get_position_changes(session, selected_driver)
-            if fig: st.pyplot(fig)
+        st.divider()
+        
+        st.markdown(f"#### POSITION TRACKER: {selected_driver}")
+        fig = f1.get_position_changes(session, selected_driver)
+        if fig: st.pyplot(fig, use_container_width=True)
 
     # TAB 4: FIN DE SEMANA
     with tab4:
@@ -229,7 +206,7 @@ if st.session_state['session'] is not None:
         if st.button("LOAD WEEKEND OVERVIEW"):
             with st.spinner("Processing multi-session telemetry..."):
                 fig = f1.get_driver_weekend_laptimes(session, selected_driver)
-                if fig: st.pyplot(fig)
+                if fig: st.pyplot(fig, use_container_width=True)
 
     # TAB 5: REPLAY
     with tab5:
@@ -243,7 +220,6 @@ if st.session_state['session'] is not None:
             st.warning("Replay available for Race sessions only.")
 
 else:
-    # Pantalla de bienvenida vacía
     st.markdown("""
     <div style='text-align: center; padding: 50px; opacity: 0.5;'>
         <h1>NO DATA LOADED</h1>
