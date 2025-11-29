@@ -94,7 +94,7 @@ def get_speed_map(session, driver):
             circuit_info = session.get_circuit_info()
             track_angle = circuit_info.rotation / 180 * np.pi
         except:
-            track_angle = 0 # Fallback si no hay info
+            track_angle = 0 
 
         # Preparar coordenadas rotadas
         x = np.array(tel['X'].values)
@@ -116,7 +116,6 @@ def get_speed_map(session, driver):
         cmap = plt.get_cmap('plasma')
         norm = plt.Normalize(speed.min(), speed.max())
         
-        # Ahora el estilo es igual al Gear map: Sin fondo grueso, solo la línea de color
         lc = LineCollection(segments, cmap=cmap, norm=norm, linestyle='-', linewidth=5)
         lc.set_array(speed)
         line = ax.add_collection(lc)
@@ -126,11 +125,18 @@ def get_speed_map(session, driver):
         cbar.ax.yaxis.set_tick_params(color='white')
         plt.setp(plt.getp(cbar.ax.axes, 'yticklabels'), color='white')
 
+        # --- FIX: FORZAR LÍMITES DE EJES ---
+        # Al usar add_collection sin plot(), matplotlib no auto-escala. Lo hacemos manual:
+        margin = 100
+        ax.set_xlim(x_rot.min() - margin, x_rot.max() + margin)
+        ax.set_ylim(y_rot.min() - margin, y_rot.max() + margin)
+
         ax.axis('off')
         ax.set_aspect('equal')
         ax.set_title(f"Speed Map - {driver}", color='white', fontweight='bold', fontsize=18, pad=20)
         return fig
     except Exception as e:
+        print(f"Error en Speed Map: {e}")
         return None
 
 def get_gear_map(session, driver):
@@ -139,7 +145,6 @@ def get_gear_map(session, driver):
         lap = session.laps.pick_drivers(driver).pick_fastest()
         tel = lap.get_telemetry()
         
-        # Obtener rotación
         try:
             circuit_info = session.get_circuit_info()
             track_angle = circuit_info.rotation / 180 * np.pi
@@ -168,6 +173,11 @@ def get_gear_map(session, driver):
         lc_comp.set_linewidth(5)
         ax.add_collection(lc_comp)
         
+        # --- FIX: FORZAR LÍMITES DE EJES TAMBIÉN AQUÍ ---
+        margin = 100
+        ax.set_xlim(x_rot.min() - margin, x_rot.max() + margin)
+        ax.set_ylim(y_rot.min() - margin, y_rot.max() + margin)
+
         ax.axis('equal')
         ax.axis('off')
 
