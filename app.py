@@ -22,10 +22,21 @@ st.markdown("""
         color: white;
         font-family: 'Titillium Web', sans-serif;
     }
+    
+    /* --- BARRA LATERAL --- */
     section[data-testid="stSidebar"] {
         background-color: #1b1b26;
         border-right: 2px solid #e10600;
     }
+    
+    /* CORRECCIÓN: Texto blanco en la barra lateral */
+    section[data-testid="stSidebar"] p, 
+    section[data-testid="stSidebar"] span, 
+    section[data-testid="stSidebar"] label {
+        color: #ffffff !important;
+    }
+
+    /* Encabezados */
     h1 {
         font-family: 'Titillium Web', sans-serif;
         font-weight: 700;
@@ -42,14 +53,14 @@ st.markdown("""
         text-transform: uppercase;
     }
     
-    /* --- ETIQUETAS BLANCAS (NUEVO) --- */
-    /* Fuerza el color blanco en los títulos de los widgets (Selectbox, Inputs, etc.) */
+    /* Etiquetas de Widgets (Inputs) */
     div[data-testid="stWidgetLabel"] p {
         color: #ffffff !important;
         font-weight: 600;
         font-size: 1rem;
     }
 
+    /* Botones */
     div.stButton > button {
         background-color: #e10600;
         color: white;
@@ -64,6 +75,8 @@ st.markdown("""
         background-color: #ff1801;
         border: 1px solid white;
     }
+    
+    /* Pestañas */
     .stTabs [data-baseweb="tab-list"] {
         gap: 10px;
     }
@@ -78,6 +91,7 @@ st.markdown("""
         background-color: #e10600 !important;
         color: white !important;
     }
+    
     div[data-testid="stMetricValue"] {
         font-family: 'Titillium Web', sans-serif;
         color: #e10600;
@@ -117,7 +131,7 @@ if page == "🏠 Project Overview":
     st.markdown("""
     <div class="project-card">
         <h3>📊 About the Project</h3>
-        <p>This application is an advanced telemetry analysis tool designed to visualize Formula 1 data using the 
+        <p style="color: white;">This application is an advanced telemetry analysis tool designed to visualize Formula 1 data using the 
         official <b>FastF1</b> library. It allows users to explore race dynamics, tyre strategies, and driver performance 
         through interactive dashboards.</p>
     </div>
