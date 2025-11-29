@@ -2,111 +2,211 @@ import streamlit as st
 import fastf1
 import fastf1.plotting
 import os
-import f1_analysis as f1  # <--- IMPORTAMOS TU ARCHIVO DE LÓGICA AQUÍ
+import f1_analysis as f1
 
 # --- CONFIGURACIÓN INICIAL ---
-st.set_page_config(page_title="F1 Telemetry Pro", page_icon="🏎️", layout="wide")
+st.set_page_config(
+    page_title="F1 Data Hub", 
+    page_icon="🏁", 
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# Configuración de FastF1 y Matplotlib
+# --- ESTILOS CSS F1 THEMATIC ---
+st.markdown("""
+<style>
+    /* Importar fuente similar a la oficial de F1 */
+    @import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@400;600;700&display=swap');
+
+    /* Fondo general */
+    .stApp {
+        background-color: #15151e;
+        color: white;
+        font-family: 'Titillium Web', sans-serif;
+    }
+
+    /* Sidebar */
+    section[data-testid="stSidebar"] {
+        background-color: #1b1b26;
+        border-right: 2px solid #e10600;
+    }
+
+    /* Encabezados Principales (H1) */
+    h1 {
+        font-family: 'Titillium Web', sans-serif;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: white;
+        border-bottom: 4px solid #e10600; /* Borde rojo F1 */
+        padding-bottom: 10px;
+        letter-spacing: 1px;
+    }
+
+    /* Subtítulos (H2, H3) */
+    h2, h3 {
+        font-family: 'Titillium Web', sans-serif;
+        font-weight: 600;
+        color: #f0f0f0;
+        text-transform: uppercase;
+    }
+
+    /* Botones Estilo F1 */
+    div.stButton > button {
+        background-color: #e10600;
+        color: white;
+        border: none;
+        border-radius: 5px 15px 5px 15px; /* Bordes asimétricos estilo F1 */
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        transition: all 0.3s ease;
+    }
+    div.stButton > button:hover {
+        background-color: #ff1801;
+        border: 1px solid white;
+    }
+
+    /* Pestañas */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 10px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: #2b2b3b;
+        border-radius: 5px 5px 0 0;
+        color: white;
+        padding: 10px 20px;
+        font-weight: 600;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #e10600 !important;
+        color: white !important;
+    }
+
+    /* Métricas y Cajas */
+    div[data-testid="stMetricValue"] {
+        font-family: 'Titillium Web', sans-serif;
+        color: #e10600;
+    }
+    
+    /* Ajustes generales */
+    .block-container {
+        padding-top: 2rem;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Configuración de FastF1
 if not os.path.exists('cache'):
     os.makedirs('cache')
 fastf1.Cache.enable_cache('cache') 
 fastf1.plotting.setup_mpl(mpl_timedelta_support=True, color_scheme='fastf1')
 
-# Título
-st.title("🏎️ F1 Telemetry Pro Dashboard")
-st.markdown("Análisis avanzado de telemetría y estrategias de Fórmula 1.")
+# --- HEADER PRINCIPAL ---
+col_logo, col_title = st.columns([1, 6])
+with col_title:
+    st.title("F1 Telemetry Hub")
+    st.caption("OFFICIAL DATA ANALYTICS DASHBOARD")
 
-# --- BARRA LATERAL INTELIGENTE ---
-st.sidebar.header("1. Configuración de Carrera")
+# --- BARRA LATERAL ---
+st.sidebar.markdown("## ⚙️ RACE CONTROL")
 
 # A. Selección de Año
-year = st.sidebar.selectbox("Año", [2024, 2023, 2022, 2021, 2020], index=1)
+year = st.sidebar.selectbox("Season", [2024, 2023, 2022, 2021], index=0)
 
-# B. Carga dinámica del Calendario (Cacheada)
+# B. Calendario
 @st.cache_data
 def get_schedule(y):
     return fastf1.get_event_schedule(y, include_testing=False)
 
 try:
     schedule = get_schedule(year)
-    # Crear lista de eventos: "Round 1: Bahrain Grand Prix"
     event_options = schedule['EventName'].tolist()
-    selected_event_name = st.sidebar.selectbox("Gran Premio", event_options)
     
-    # C. Tipo de Sesión
-    session_map = {'R': 'Carrera', 'Q': 'Clasificación', 'S': 'Sprint', 'FP1': 'Práctica 1', 'FP2': 'Práctica 2'}
-    session_key = st.sidebar.selectbox("Sesión", list(session_map.keys()), format_func=lambda x: session_map[x])
+    # Encontrar la próxima carrera o la última por defecto
+    default_ix = len(event_options) - 1 if len(event_options) > 0 else 0
+    selected_event_name = st.sidebar.selectbox("Grand Prix", event_options, index=default_ix)
+    
+    # C. Sesión
+    session_map = {'R': 'Race', 'Q': 'Qualifying', 'S': 'Sprint', 'FP1': 'Practice 1', 'FP2': 'Practice 2'}
+    session_key = st.sidebar.selectbox("Session", list(session_map.keys()), format_func=lambda x: session_map[x])
 
-    # Botón de cargar sesión
-    load_btn = st.sidebar.button("⬇️ Cargar Datos de Sesión", type="primary")
+    load_btn = st.sidebar.button("INITIALIZE SESSION DATA", type="primary")
 
 except Exception as e:
-    st.error("Error cargando el calendario. Revisa tu conexión.")
+    st.error("Connection Error: Could not fetch season schedule.")
     st.stop()
 
-
-# --- LÓGICA DE CARGA DE DATOS ---
+# --- LÓGICA DE CARGA ---
 if 'session' not in st.session_state:
     st.session_state['session'] = None
 
 if load_btn:
-    with st.spinner(f"Descargando datos de {selected_event_name} {year}..."):
+    with st.spinner(f"📥 FETCHING TELEMETRY: {selected_event_name} {year}..."):
         try:
             session = fastf1.get_session(year, selected_event_name, session_key)
             session.load()
             st.session_state['session'] = session
-            st.success(f"✅ Datos cargados: {session.event['EventName']}")
+            st.success("SYSTEM READY")
         except Exception as e:
-            st.error(f"Error cargando sesión: {e}")
+            st.error(f"DATA LOAD ERROR: {e}")
 
-# --- CONTENIDO PRINCIPAL (SOLO SI HAY SESIÓN CARGADA) ---
+# --- DASHBOARD ---
 if st.session_state['session'] is not None:
     session = st.session_state['session']
     
-    # Selector de Piloto (Dinámico según la sesión cargada)
+    # Header de la Sesión
+    st.markdown(f"### 🏁 {session.event['EventName'].upper()} - {year}")
+    
+    # Selector de Piloto
     drivers = session.drivers
     driver_list = [session.get_driver(d)['Abbreviation'] for d in drivers]
     
-    st.sidebar.header("2. Configuración de Piloto")
-    selected_driver = st.sidebar.selectbox("Piloto a Analizar", driver_list, index=0)
+    st.sidebar.markdown("## 🏎️ DRIVER SELECT")
+    selected_driver = st.sidebar.selectbox("Select Driver", driver_list, index=0)
+    
+    # Información rápida del piloto
+    d_info = session.get_driver(selected_driver)
+    st.sidebar.markdown(f"""
+    <div style='background-color: #2b2b3b; padding: 10px; border-radius: 5px; border-left: 4px solid #{d_info.TeamColor if d_info.TeamColor else 'fff'};'>
+        <h3 style='margin:0; color:white;'>{d_info.BroadcastName}</h3>
+        <p style='margin:0; color:#aaa;'>#{d_info.TeamName}</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-    # --- PESTAÑAS DE ANÁLISIS ---
+    # --- TABS ---
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "🗺️ Telemetría y Pista", 
-        "⏱️ Tiempos", 
-        "🧠 Estrategia",
-        "📅 Fin de Semana",
-        "🎬 Replay"
+        "TRACK DATA", 
+        "LAP ANALYSIS", 
+        "STRATEGY",
+        "WEEKEND",
+        "REPLAY"
     ])
 
     # TAB 1: MAPAS
     with tab1:
         col1, col2 = st.columns(2)
         with col1:
-            st.subheader(f"Mapa de Velocidad - {selected_driver}")
+            st.markdown("#### SPEED TRAP")
             fig = f1.get_speed_map(session, selected_driver)
             if fig: st.pyplot(fig)
         
         with col2:
-            st.subheader(f"Mapa de Marchas - {selected_driver}")
+            st.markdown("#### GEAR SHIFTS")
             fig = f1.get_gear_map(session, selected_driver)
             if fig: st.pyplot(fig)
 
     # TAB 2: TIEMPOS
     with tab2:
-        st.subheader("Distribución de Tiempos (Top 10)")
+        st.markdown("#### PACE DISTRIBUTION (TOP 10)")
         fig = f1.get_lap_distribution(session)
         if fig: st.pyplot(fig)
         
-        st.divider()
-        st.subheader(f"Ritmo de Vuelta: {selected_driver}")
+        st.markdown(f"#### LAP EVOLUTION: {selected_driver}")
         fig = f1.get_driver_laptimes(session, selected_driver)
         if fig: st.pyplot(fig)
 
         if session_key == 'R':
-            st.divider()
-            st.subheader("Ritmo de Equipos (Race Pace)")
+            st.markdown("#### TEAM RACE PACE")
             fig = f1.get_team_pace(session)
             if fig: st.pyplot(fig)
 
@@ -114,35 +214,39 @@ if st.session_state['session'] is not None:
     with tab3:
         colA, colB = st.columns([1, 1])
         with colA:
-            st.subheader("Uso de Neumáticos")
+            st.markdown("#### TYRE STRATEGY")
             fig = f1.get_strategy_chart(session)
             if fig: st.pyplot(fig)
         
         with colB:
-            st.subheader(f"Posiciones en Carrera ({selected_driver})")
+            st.markdown(f"#### POSITION TRACKER: {selected_driver}")
             fig = f1.get_position_changes(session, selected_driver)
             if fig: st.pyplot(fig)
 
     # TAB 4: FIN DE SEMANA
     with tab4:
-        st.info("Este gráfico carga datos de FP1, FP2, FP3, Q y R. Puede tardar unos segundos.")
-        if st.button("Analizar Fin de Semana Completo"):
-            with st.spinner("Procesando todas las sesiones..."):
+        st.info("Analyzing full weekend data (FP1-Race). This may take moment.")
+        if st.button("LOAD WEEKEND OVERVIEW"):
+            with st.spinner("Processing multi-session telemetry..."):
                 fig = f1.get_driver_weekend_laptimes(session, selected_driver)
                 if fig: st.pyplot(fig)
-                else: st.warning("No se encontraron datos completos del fin de semana.")
 
     # TAB 5: REPLAY
     with tab5:
         if session_key == 'R':
-            st.subheader("Replay de Carrera")
-            if st.button("Generar Animación"):
-                with st.spinner("Renderizando animación..."):
+            st.markdown("#### RACE REPLAY")
+            if st.button("LAUNCH REPLAY"):
+                with st.spinner("Rendering animation..."):
                     fig = f1.get_race_replay(session)
                     if fig: st.plotly_chart(fig, use_container_width=True)
         else:
-            st.warning("El Replay solo está disponible para carreras.")
+            st.warning("Replay available for Race sessions only.")
 
 else:
-    # Mensaje de bienvenida cuando no hay datos
-    st.info("👈 Usa el menú lateral para seleccionar una carrera y cargar los datos.")
+    # Pantalla de bienvenida vacía
+    st.markdown("""
+    <div style='text-align: center; padding: 50px; opacity: 0.5;'>
+        <h1>NO DATA LOADED</h1>
+        <p>PLEASE SELECT A GRAND PRIX FROM RACE CONTROL</p>
+    </div>
+    """, unsafe_allow_html=True)
