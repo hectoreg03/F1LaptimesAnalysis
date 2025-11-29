@@ -1,3 +1,4 @@
+pip install fast1
 import streamlit as st
 import fastf1
 import fastf1.plotting
