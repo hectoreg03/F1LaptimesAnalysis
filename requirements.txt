@@ -1,0 +1,8 @@
+streamlit
+fastf1
+matplotlib
+seaborn
+pandas
+plotly
+numpy
+scipy
