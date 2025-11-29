@@ -160,11 +160,17 @@ if st.session_state['session'] is not None:
 
     # TAB 1: MAPAS
     with tab1:
+        st.markdown("#### CIRCUIT LAYOUT & CORNERS")
+        fig = f1.get_track_map_with_corners(session)
+        if fig: st.pyplot(fig, use_container_width=True)
+
+        st.divider()
+
         st.markdown("#### SPEED TRAP VISUALIZATION")
         fig = f1.get_speed_map(session, selected_driver)
         if fig: st.pyplot(fig, use_container_width=True)
         
-        st.divider() # Línea de separación limpia
+        st.divider() 
         
         st.markdown("#### GEAR SHIFTS ANALYSIS")
         fig = f1.get_gear_map(session, selected_driver)
