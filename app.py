@@ -23,7 +23,6 @@ st.markdown("""
         font-family: 'Titillium Web', sans-serif;
     }
     
-    /* --- BARRA LATERAL (SIDEBAR) --- */
     section[data-testid="stSidebar"] {
         background-color: #1b1b26;
         border-right: 2px solid #e10600;
@@ -39,7 +38,6 @@ st.markdown("""
     section[data-testid="stSidebar"] li {
         color: #ffffff !important;
     }
-
     /* 2. Etiquetas de Inputs (Labels encima de los selectores) */
     section[data-testid="stSidebar"] .stMultiSelect label p,
     section[data-testid="stSidebar"] .stSelectbox label p,
@@ -49,14 +47,12 @@ st.markdown("""
         font-weight: 700;
         font-size: 14px;
     }
-
     /* 3. Opciones de Radio Button (El menú de navegación) */
     section[data-testid="stSidebar"] .stRadio label p {
         color: #ffffff !important;
         font-size: 16px;
     }
 
-    /* --- ESTILOS GENERALES DEL RESTO DE LA APP --- */
     h1 {
         font-family: 'Titillium Web', sans-serif;
         font-weight: 700;
@@ -73,14 +69,12 @@ st.markdown("""
         text-transform: uppercase;
     }
 
-    /* Etiquetas de Widgets (Inputs) en el cuerpo principal */
     div[data-testid="stWidgetLabel"] p {
         color: #ffffff !important;
         font-weight: 600;
         font-size: 1rem;
     }
 
-    /* Botones */
     div.stButton > button {
         background-color: #e10600;
         color: white;
@@ -96,7 +90,6 @@ st.markdown("""
         border: 1px solid white;
     }
     
-    /* Pestañas */
     .stTabs [data-baseweb="tab-list"] {
         gap: 10px;
     }
@@ -120,7 +113,6 @@ st.markdown("""
         padding-top: 2rem;
     }
     
-    /* Caja de información del proyecto */
     .project-card {
         background-color: #2b2b3b;
         padding: 20px;
@@ -129,30 +121,23 @@ st.markdown("""
         margin-bottom: 20px;
     }
     
-    /* Forzar texto blanco dentro de la tarjeta de proyecto */
     .project-card p, .project-card h3 {
         color: white !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Configuración de FastF1
 if not os.path.exists('cache'):
     os.makedirs('cache')
 fastf1.Cache.enable_cache('cache') 
 fastf1.plotting.setup_mpl(mpl_timedelta_support=True, color_scheme='fastf1')
 
-# --- NAVEGACIÓN ---
 st.sidebar.image("https://upload.wikimedia.org/wikipedia/commons/3/33/F1.svg", width=100)
 st.sidebar.markdown("## 🧭 NAVIGATION")
 page = st.sidebar.radio("Go to", ["🏠 Project Overview", "🏁 Telemetry Dashboard"], label_visibility="collapsed")
 
-# =============================================================================
-# PÁGINA 1: PROJECT OVERVIEW (HOME)
-# =============================================================================
 if page == "🏠 Project Overview":
     st.title("F1 Telemetry Analysis Project")
-    
     st.markdown("""
     <div class="project-card">
         <h3>📊 About the Project</h3>
@@ -163,7 +148,6 @@ if page == "🏠 Project Overview":
     """, unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
-    
     with col1:
         st.markdown("### 🎯 Objectives")
         st.markdown("""
@@ -172,7 +156,6 @@ if page == "🏠 Project Overview":
         - **Understand** tyre strategies and race pace evolution.
         - **Replay** race positions dynamically.
         """)
-
     with col2:
         st.markdown("### 🛠️ Tech Stack")
         st.markdown("""
@@ -182,25 +165,17 @@ if page == "🏠 Project Overview":
         - **Matplotlib & Seaborn**: High-precision static plotting.
         - **Plotly**: Interactive animations and charts.
         """)
-    
     st.divider()
     st.info("👈 Select **'Telemetry Dashboard'** in the sidebar to start analyzing data.")
 
-# =============================================================================
-# PÁGINA 2: DASHBOARD
-# =============================================================================
 elif page == "🏁 Telemetry Dashboard":
-
-    # --- HEADER PRINCIPAL ---
     col_logo, col_title = st.columns([1, 6])
     with col_title:
         st.title("F1 Telemetry Hub")
         st.caption("OFFICIAL DATA ANALYTICS DASHBOARD")
 
-    # --- BARRA LATERAL ---
     st.sidebar.markdown("---")
     st.sidebar.markdown("## ⚙️ RACE CONTROL")
-
     year = st.sidebar.selectbox("Season", [2024, 2023, 2022, 2021], index=0)
 
     @st.cache_data
@@ -212,17 +187,13 @@ elif page == "🏁 Telemetry Dashboard":
         event_options = schedule['EventName'].tolist()
         default_ix = len(event_options) - 1 if len(event_options) > 0 else 0
         selected_event_name = st.sidebar.selectbox("Grand Prix", event_options, index=default_ix)
-        
         session_map = {'R': 'Race', 'Q': 'Qualifying', 'S': 'Sprint', 'FP1': 'Practice 1', 'FP2': 'Practice 2'}
         session_key = st.sidebar.selectbox("Session", list(session_map.keys()), format_func=lambda x: session_map[x])
-
         load_btn = st.sidebar.button("INITIALIZE SESSION DATA", type="primary")
-
     except Exception as e:
         st.error("Connection Error: Could not fetch season schedule.")
         st.stop()
 
-    # --- LÓGICA DE CARGA ---
     if 'session' not in st.session_state:
         st.session_state['session'] = None
 
@@ -236,19 +207,16 @@ elif page == "🏁 Telemetry Dashboard":
             except Exception as e:
                 st.error(f"DATA LOAD ERROR: {e}")
 
-    # --- DASHBOARD ---
     if st.session_state['session'] is not None:
         session = st.session_state['session']
-        
         st.markdown(f"### 🏁 {session.event['EventName'].upper()} - {year}")
-        
         drivers = session.drivers
         driver_list = [session.get_driver(d)['Abbreviation'] for d in drivers]
         
         st.sidebar.markdown("## 🏎️ DRIVER SELECT")
         selected_driver = st.sidebar.selectbox("Select Driver", driver_list, index=0)
-        
         d_info = session.get_driver(selected_driver)
+        
         st.sidebar.markdown(f"""
         <div style='background-color: #2b2b3b; padding: 10px; border-radius: 5px; border-left: 4px solid #{d_info.TeamColor if d_info.TeamColor else 'fff'};'>
             <h3 style='margin:0; color:white;'>{d_info.BroadcastName}</h3>
@@ -256,7 +224,6 @@ elif page == "🏁 Telemetry Dashboard":
         </div>
         """, unsafe_allow_html=True)
 
-        # --- TABS (LAYOUT HORIZONTAL ÚNICO) ---
         tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
             "TRACK DATA", 
             "LAP ANALYSIS", 
@@ -266,32 +233,37 @@ elif page == "🏁 Telemetry Dashboard":
             "CONDITIONS"
         ])
 
-        # TAB 1: MAPAS
         with tab1:
-            st.markdown("#### CIRCUIT LAYOUT & CORNERS")
+            st.markdown("#### CIRCUIT LAYOUT")
             fig = f1.get_track_map_with_corners(session)
             if fig: st.pyplot(fig, use_container_width=True)
 
             st.divider()
-
-            st.markdown("#### SPEED TRAP VISUALIZATION")
+            st.markdown("#### SPEED MAP")
             fig = f1.get_speed_map(session, selected_driver)
+            if fig: st.pyplot(fig, use_container_width=True)
+
+            st.divider()
+            st.markdown("#### TOP SPEEDS BY DRIVER (Speed Trap)")
+            fig = f1.get_top_speeds(session)
             if fig: st.pyplot(fig, use_container_width=True)
             
             st.divider() 
-            
-            st.markdown("#### GEAR SHIFTS ANALYSIS")
+            st.markdown("#### GEAR SHIFTS")
             fig = f1.get_gear_map(session, selected_driver)
             if fig: st.pyplot(fig, use_container_width=True)
 
-        # TAB 2: TIEMPOS
         with tab2:
             st.markdown("#### PACE DISTRIBUTION (TOP 10)")
             fig = f1.get_lap_distribution(session)
             if fig: st.pyplot(fig, use_container_width=True)
             
             st.divider()
-            
+            st.markdown("#### BEST SECTOR TIMES")
+            fig = f1.get_best_sectors(session)
+            if fig: st.pyplot(fig, use_container_width=True)
+
+            st.divider()
             st.markdown(f"#### LAP EVOLUTION: {selected_driver}")
             fig = f1.get_driver_laptimes(session, selected_driver)
             if fig: st.pyplot(fig, use_container_width=True)
@@ -302,27 +274,29 @@ elif page == "🏁 Telemetry Dashboard":
                 fig = f1.get_team_pace(session)
                 if fig: st.pyplot(fig, use_container_width=True)
 
-        # TAB 3: ESTRATEGIA
         with tab3:
             st.markdown("#### TYRE STRATEGY OVERVIEW")
             fig = f1.get_strategy_chart(session)
             if fig: st.pyplot(fig, use_container_width=True)
+
+            st.divider()
+            st.markdown(f"#### TYRE PERFORMANCE: {selected_driver}")
+            st.caption("Comparison of lap times per tyre compound used.")
+            fig = f1.get_tyre_performance_analysis(session, selected_driver)
+            if fig: st.pyplot(fig, use_container_width=True)
             
             st.divider()
-            
             st.markdown(f"#### POSITION TRACKER: {selected_driver}")
             fig = f1.get_position_changes(session, selected_driver)
             if fig: st.pyplot(fig, use_container_width=True)
 
-        # TAB 4: FIN DE SEMANA
         with tab4:
-            st.info("Analyzing full weekend data (FP1-Race). This may take moment.")
+            st.info("Analyzing full weekend data (FP1-Race).")
             if st.button("LOAD WEEKEND OVERVIEW"):
                 with st.spinner("Processing multi-session telemetry..."):
                     fig = f1.get_driver_weekend_laptimes(session, selected_driver)
                     if fig: st.pyplot(fig, use_container_width=True)
 
-        # TAB 5: REPLAY
         with tab5:
             if session_key == 'R':
                 st.markdown("#### RACE REPLAY")
@@ -333,18 +307,18 @@ elif page == "🏁 Telemetry Dashboard":
             else:
                 st.warning("Replay available for Race sessions only.")
 
-        # TAB 6: CONDITIONS
         with tab6:
-            st.markdown("#### RACE CONDITIONS (WEATHER & FLAGS)")
-            st.caption("Analysis of track temperature, humidity, rain events, and safety car periods.")
-            
-            # Chequeo si hay datos de clima
+            st.markdown("#### WEATHER CONDITIONS")
             if hasattr(session, 'weather_data') and not session.weather_data.empty:
-                 fig = f1.get_race_conditions_chart(session)
+                 fig = f1.get_weather_chart(session)
                  if fig: st.pyplot(fig, use_container_width=True)
+                 
+                 st.divider()
+                 st.markdown("#### RACE CONTROL STATUS (FLAGS)")
+                 fig2 = f1.get_flag_laps_chart(session)
+                 if fig2: st.pyplot(fig2, use_container_width=True)
             else:
                  st.warning("Weather data not available for this session.")
-
     else:
         st.markdown("""
         <div style='text-align: center; padding: 50px; opacity: 0.5;'>
