@@ -11,7 +11,6 @@ from matplotlib import colormaps
 # --- CONFIGURACIÓN DE ESTILO ---
 F1_RED = '#e10600'
 F1_BG = '#15151e' 
-# TAMAÑO ESTÁNDAR PARA NORMALIZAR TODAS LAS GRÁFICAS (Ancho, Alto)
 STANDARD_FIGSIZE = (13, 7)
 
 def apply_f1_style(ax, title):
@@ -27,28 +26,101 @@ def apply_f1_style(ax, title):
     ax.grid(color='gray', linestyle=':', linewidth=0.5, alpha=0.4)
     ax.set_facecolor(F1_BG)
 
+# --- HELPER: ROTACIÓN ---
+def rotate(xy, *, angle):
+    rot_mat = np.array([[np.cos(angle), np.sin(angle)],
+                        [-np.sin(angle), np.cos(angle)]])
+    return np.matmul(xy, rot_mat)
+
+def get_track_map_with_corners(session):
+    """Genera el mapa del circuito con las curvas numeradas y rotado."""
+    try:
+        circuit_info = session.get_circuit_info()
+        lap = session.laps.pick_fastest()
+        pos = lap.get_pos_data()
+
+        # 1. Obtener coordenadas y rotar
+        track = pos.loc[:, ('X', 'Y')].to_numpy()
+        track_angle = circuit_info.rotation / 180 * np.pi
+        rotated_track = rotate(track, angle=track_angle)
+
+        fig, ax = plt.subplots(figsize=STANDARD_FIGSIZE)
+        fig.patch.set_facecolor(F1_BG)
+        ax.set_facecolor(F1_BG)
+
+        # 2. Dibujar Pista (Línea blanca simple)
+        ax.plot(rotated_track[:, 0], rotated_track[:, 1], color='white', linewidth=4)
+
+        # 3. Dibujar Curvas
+        offset_vector = [500, 0]
+        for _, corner in circuit_info.corners.iterrows():
+            txt = f"{corner['Number']}{corner['Letter']}"
+            offset_angle = corner['Angle'] / 180 * np.pi
+            offset_x, offset_y = rotate(offset_vector, angle=offset_angle)
+            
+            text_x = corner['X'] + offset_x
+            text_y = corner['Y'] + offset_y
+            
+            text_x, text_y = rotate([text_x, text_y], angle=track_angle)
+            track_x, track_y = rotate([corner['X'], corner['Y']], angle=track_angle)
+
+            # Línea conectora
+            ax.plot([track_x, text_x], [track_y, text_y], color='#888', linestyle='--')
+            
+            # Círculo marcador
+            ax.scatter(text_x, text_y, color='#222', edgecolor='white', s=300, zorder=5)
+            
+            # Número
+            ax.text(text_x, text_y, txt, va='center', ha='center', 
+                    size='small', color='white', fontweight='bold', zorder=6)
+
+        ax.set_title(f"Circuit Layout: {session.event['Location']}", color='white', fontsize=18, fontweight='bold', pad=20)
+        ax.axis('equal')
+        ax.axis('off')
+        
+        return fig
+    except Exception as e:
+        print(f"Error generando Track Map: {e}")
+        return None
+
 def get_speed_map(session, driver):
+    """Mapa de velocidad rotado."""
     try:
         lap = session.laps.pick_drivers(driver).pick_fastest()
         tel = lap.get_telemetry()
+        
+        # Obtener rotación
+        try:
+            circuit_info = session.get_circuit_info()
+            track_angle = circuit_info.rotation / 180 * np.pi
+        except:
+            track_angle = 0 # Fallback si no hay info
+
+        # Preparar coordenadas rotadas
         x = np.array(tel['X'].values)
         y = np.array(tel['Y'].values)
-        points = np.array([x, y]).T.reshape(-1, 1, 2)
+        xy_points = np.array([x, y]).T
+        rotated_points = rotate(xy_points, angle=track_angle)
+        
+        x_rot = rotated_points[:, 0]
+        y_rot = rotated_points[:, 1]
+        
+        points = np.array([x_rot, y_rot]).T.reshape(-1, 1, 2)
         segments = np.concatenate([points[:-1], points[1:]], axis=1)
         speed = tel['Speed']
 
-        # Usamos el tamaño estándar
         fig, ax = plt.subplots(figsize=STANDARD_FIGSIZE)
         fig.patch.set_facecolor(F1_BG)
+        ax.set_facecolor(F1_BG)
         
         cmap = plt.get_cmap('plasma')
         norm = plt.Normalize(speed.min(), speed.max())
-        lc = LineCollection(segments, cmap=cmap, norm=norm, linestyle='-', linewidth=6)
+        
+        # Ahora el estilo es igual al Gear map: Sin fondo grueso, solo la línea de color
+        lc = LineCollection(segments, cmap=cmap, norm=norm, linestyle='-', linewidth=5)
         lc.set_array(speed)
         line = ax.add_collection(lc)
         
-        ax.plot(x, y, color='#333333', linestyle='-', linewidth=14, zorder=0)
-
         cbar = plt.colorbar(line, ax=ax, orientation='vertical', pad=0.02)
         cbar.set_label('Velocidad (km/h)', color='white')
         cbar.ax.yaxis.set_tick_params(color='white')
@@ -62,17 +134,33 @@ def get_speed_map(session, driver):
         return None
 
 def get_gear_map(session, driver):
+    """Mapa de marchas rotado."""
     try:
         lap = session.laps.pick_drivers(driver).pick_fastest()
         tel = lap.get_telemetry()
+        
+        # Obtener rotación
+        try:
+            circuit_info = session.get_circuit_info()
+            track_angle = circuit_info.rotation / 180 * np.pi
+        except:
+            track_angle = 0
+
         x = np.array(tel['X'].values)
         y = np.array(tel['Y'].values)
-        points = np.array([x, y]).T.reshape(-1, 1, 2)
+        xy_points = np.array([x, y]).T
+        rotated_points = rotate(xy_points, angle=track_angle)
+        
+        x_rot = rotated_points[:, 0]
+        y_rot = rotated_points[:, 1]
+
+        points = np.array([x_rot, y_rot]).T.reshape(-1, 1, 2)
         segments = np.concatenate([points[:-1], points[1:]], axis=1)
         gear = tel['nGear'].to_numpy().astype(float)
 
         fig, ax = plt.subplots(figsize=STANDARD_FIGSIZE)
         fig.patch.set_facecolor(F1_BG)
+        ax.set_facecolor(F1_BG)
 
         cmap = colormaps['Paired']
         lc_comp = LineCollection(segments, norm=plt.Normalize(1, cmap.N+1), cmap=cmap)
@@ -158,7 +246,6 @@ def get_strategy_chart(session):
         stints = stints.rename(columns={"LapNumber": "StintLength"})
         drivers_ordered = [session.get_driver(d)["Abbreviation"] for d in session.drivers]
 
-        # Cambiado a STANDARD_FIGSIZE para que sea ancho en lugar de alto y estrecho
         fig, ax = plt.subplots(figsize=STANDARD_FIGSIZE)
         fig.patch.set_facecolor(F1_BG)
         ax.set_facecolor(F1_BG)
@@ -181,7 +268,6 @@ def get_strategy_chart(session):
 
 def get_position_changes(session, highlight_driver):
     try:
-        # Cambiado a STANDARD_FIGSIZE
         fig, ax = plt.subplots(figsize=STANDARD_FIGSIZE)
         fig.patch.set_facecolor(F1_BG)
         ax.set_facecolor(F1_BG)
@@ -270,7 +356,6 @@ def get_driver_weekend_laptimes(current_session, driver):
         return None
 
 def get_race_replay(session):
-    # La altura se controla directamente en Plotly, 700px es un buen balance
     try:
         laps = session.laps.pick_drivers(session.drivers).reset_index()
         laps = laps.dropna(subset=['Time', 'LapNumber', 'LapTime'])
