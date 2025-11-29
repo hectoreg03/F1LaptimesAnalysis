@@ -33,13 +33,11 @@ def rotate(xy, *, angle):
     return np.matmul(xy, rot_mat)
 
 def get_track_map_with_corners(session):
-    """Genera el mapa del circuito con las curvas numeradas y rotado."""
     try:
         circuit_info = session.get_circuit_info()
         lap = session.laps.pick_fastest()
         pos = lap.get_pos_data()
 
-        # 1. Obtener coordenadas y rotar
         track = pos.loc[:, ('X', 'Y')].to_numpy()
         track_angle = circuit_info.rotation / 180 * np.pi
         rotated_track = rotate(track, angle=track_angle)
@@ -48,10 +46,8 @@ def get_track_map_with_corners(session):
         fig.patch.set_facecolor(F1_BG)
         ax.set_facecolor(F1_BG)
 
-        # 2. Dibujar Pista (Línea blanca simple)
         ax.plot(rotated_track[:, 0], rotated_track[:, 1], color='white', linewidth=4)
 
-        # 3. Dibujar Curvas
         offset_vector = [500, 0]
         for _, corner in circuit_info.corners.iterrows():
             txt = f"{corner['Number']}{corner['Letter']}"
@@ -64,39 +60,29 @@ def get_track_map_with_corners(session):
             text_x, text_y = rotate([text_x, text_y], angle=track_angle)
             track_x, track_y = rotate([corner['X'], corner['Y']], angle=track_angle)
 
-            # Línea conectora
             ax.plot([track_x, text_x], [track_y, text_y], color='#888', linestyle='--')
-            
-            # Círculo marcador
             ax.scatter(text_x, text_y, color='#222', edgecolor='white', s=300, zorder=5)
-            
-            # Número
             ax.text(text_x, text_y, txt, va='center', ha='center', 
                     size='small', color='white', fontweight='bold', zorder=6)
 
         ax.set_title(f"Circuit Layout: {session.event['Location']}", color='white', fontsize=18, fontweight='bold', pad=20)
         ax.axis('equal')
         ax.axis('off')
-        
         return fig
     except Exception as e:
-        print(f"Error generando Track Map: {e}")
         return None
 
 def get_speed_map(session, driver):
-    """Mapa de velocidad rotado."""
     try:
         lap = session.laps.pick_drivers(driver).pick_fastest()
         tel = lap.get_telemetry()
         
-        # Obtener rotación
         try:
             circuit_info = session.get_circuit_info()
             track_angle = circuit_info.rotation / 180 * np.pi
         except:
             track_angle = 0 
 
-        # Preparar coordenadas rotadas
         x = np.array(tel['X'].values)
         y = np.array(tel['Y'].values)
         xy_points = np.array([x, y]).T
@@ -125,9 +111,7 @@ def get_speed_map(session, driver):
         cbar.ax.yaxis.set_tick_params(color='white')
         plt.setp(plt.getp(cbar.ax.axes, 'yticklabels'), color='white')
 
-        # --- FIX: FORZAR LÍMITES DE EJES ---
-        # Al usar add_collection sin plot(), matplotlib no auto-escala. Lo hacemos manual:
-        margin = 100
+        margin = 200
         ax.set_xlim(x_rot.min() - margin, x_rot.max() + margin)
         ax.set_ylim(y_rot.min() - margin, y_rot.max() + margin)
 
@@ -136,11 +120,9 @@ def get_speed_map(session, driver):
         ax.set_title(f"Speed Map - {driver}", color='white', fontweight='bold', fontsize=18, pad=20)
         return fig
     except Exception as e:
-        print(f"Error en Speed Map: {e}")
         return None
 
 def get_gear_map(session, driver):
-    """Mapa de marchas rotado."""
     try:
         lap = session.laps.pick_drivers(driver).pick_fastest()
         tel = lap.get_telemetry()
@@ -173,8 +155,7 @@ def get_gear_map(session, driver):
         lc_comp.set_linewidth(5)
         ax.add_collection(lc_comp)
         
-        # --- FIX: FORZAR LÍMITES DE EJES TAMBIÉN AQUÍ ---
-        margin = 100
+        margin = 200
         ax.set_xlim(x_rot.min() - margin, x_rot.max() + margin)
         ax.set_ylim(y_rot.min() - margin, y_rot.max() + margin)
 
@@ -434,4 +415,124 @@ def get_race_replay(session):
         fig.update_layout(sliders=[dict(visible=False)])
         return fig
     except Exception as e:
+        return None
+
+def get_race_conditions_chart(session):
+    """
+    Genera un gráfico combinado de:
+    1. Temperatura de Pista y Aire (Líneas)
+    2. Humedad (Línea secundaria)
+    3. Lluvia (Marcadores)
+    4. Banderas (Fondo de color según Safety Car, VSC, Red Flag)
+    """
+    try:
+        # 1. Preparar Datos
+        laps = session.laps
+        weather = session.weather_data
+        
+        # Usamos al ganador como referencia de "Vueltas de Carrera"
+        winner_id = session.drivers[0]
+        winner_laps = session.laps.pick_drivers(winner_id).reset_index()
+        
+        lap_conditions = []
+        
+        for i, row in winner_laps.iterrows():
+            lap_num = row['LapNumber']
+            # FastF1 a veces no tiene LapStartTime directo en versiones viejas, lo calculamos
+            end_t = row['Time']
+            start_t = end_t - row['LapTime'] if pd.notnull(row['LapTime']) else end_t
+            
+            # Filtrar clima en esa ventana de tiempo
+            mask = (weather['Time'] >= start_t) & (weather['Time'] <= end_t)
+            w_segment = weather[mask]
+            
+            if not w_segment.empty:
+                avg_air = w_segment['AirTemp'].mean()
+                avg_track = w_segment['TrackTemp'].mean()
+                avg_humid = w_segment['Humidity'].mean()
+                rain = w_segment['Rainfall'].any()
+            else:
+                avg_air, avg_track, avg_humid, rain = np.nan, np.nan, np.nan, False
+                
+            # Estado de Pista (Banderas)
+            # TrackStatus es un string ej: '1', '2', '24'
+            status_code = str(row['TrackStatus'])
+            status = 'Green'
+            if '5' in status_code: status = 'Red'       # Bandera Roja
+            elif '4' in status_code: status = 'SC'      # Safety Car
+            elif '6' in status_code or '7' in status_code: status = 'VSC' # VSC
+            elif '2' in status_code: status = 'Yellow'  # Amarilla
+            
+            lap_conditions.append({
+                'Lap': lap_num,
+                'AirTemp': avg_air,
+                'TrackTemp': avg_track,
+                'Humidity': avg_humid,
+                'Rain': rain,
+                'Status': status
+            })
+            
+        df_cond = pd.DataFrame(lap_conditions)
+        
+        # 2. Plotting
+        fig, ax1 = plt.subplots(figsize=STANDARD_FIGSIZE)
+        fig.patch.set_facecolor(F1_BG)
+        ax1.set_facecolor(F1_BG)
+        
+        # Líneas de Temperatura
+        l1, = ax1.plot(df_cond['Lap'], df_cond['TrackTemp'], color='#e10600', label='Track Temp (°C)', linewidth=3)
+        l2, = ax1.plot(df_cond['Lap'], df_cond['AirTemp'], color='#ff8000', label='Air Temp (°C)', linewidth=2, linestyle='--')
+        
+        ax1.set_xlabel('Lap Number', color='white')
+        ax1.set_ylabel('Temperature (°C)', color='white')
+        
+        # Eje Secundario para Humedad
+        ax2 = ax1.twinx()
+        l3, = ax2.plot(df_cond['Lap'], df_cond['Humidity'], color='#00aaff', label='Humidity (%)', linewidth=2, alpha=0.7)
+        ax2.set_ylabel('Humidity (%)', color='#00aaff')
+        ax2.tick_params(axis='y', colors='#00aaff')
+        ax2.spines['top'].set_visible(False)
+        ax2.spines['bottom'].set_visible(False)
+        ax2.spines['left'].set_visible(False)
+        
+        # Marcadores de Lluvia
+        rain_laps = df_cond[df_cond['Rain'] == True]
+        if not rain_laps.empty:
+            # Ponemos los marcadores un poco arriba del max track temp
+            y_rain_marker = df_cond['TrackTemp'].max() + 2
+            ax1.scatter(rain_laps['Lap'], [y_rain_marker] * len(rain_laps), 
+                        color='#00aaff', marker='v', s=100, label='Rain Detected', zorder=10)
+
+        # Fondos de Banderas (Spans)
+        # Iteramos y dibujamos franjas verticales
+        for idx, row in df_cond.iterrows():
+            color = None
+            if row['Status'] == 'SC': color = '#ffa500'   # Naranja SC
+            elif row['Status'] == 'VSC': color = '#ffd700' # Oro VSC
+            elif row['Status'] == 'Red': color = '#ff0000' # Rojo
+            elif row['Status'] == 'Yellow': color = '#ffff00' # Amarillo
+            
+            if color:
+                ax1.axvspan(row['Lap']-0.5, row['Lap']+0.5, color=color, alpha=0.15, lw=0)
+
+        # Leyenda Unificada
+        lines = [l1, l2, l3]
+        labels = [l.get_label() for l in lines]
+        # Añadir leyenda de lluvia si existe
+        if not rain_laps.empty:
+            # Truco para añadir el scatter a la leyenda
+            rain_proxy = plt.Line2D([0], [0], linestyle="none", marker='v', color='#00aaff', markersize=10)
+            lines.append(rain_proxy)
+            labels.append("Rain")
+            
+        ax1.legend(lines, labels, loc='upper left', frameon=True, facecolor=F1_BG, labelcolor='white')
+        
+        apply_f1_style(ax1, "Race Conditions (Weather & Flags)")
+        # Desactivar grid para limpieza visual ya que tenemos fondos de colores
+        ax1.grid(False) 
+        
+        return fig
+
+    except Exception as e:
+        print(f"Error en condiciones: {e}")
         return None
