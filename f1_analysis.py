@@ -8,6 +8,9 @@ import streamlit as st
 import plotly.express as px
 from matplotlib.collections import LineCollection
 from matplotlib import colormaps
+import plotly.express as px
+import math 
+import datetime # Para obtener el año actual
 
 # --- CONFIGURACIÓN DE ESTILO ---
 F1_RED = '#e10600'
