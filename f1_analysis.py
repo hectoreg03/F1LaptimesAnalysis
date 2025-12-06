@@ -4,6 +4,7 @@ import fastf1
 import fastf1.plotting
 import numpy as np
 import pandas as pd
+import streamlit as st
 import plotly.express as px
 from matplotlib.collections import LineCollection
 from matplotlib import colormaps
@@ -350,7 +351,6 @@ def get_race_replay(session):
     """
     Calcula el progreso de los pilotos y crea una gráfica de barras animada Plotly.
     """
-    st.info("Procesando datos para la repetición de la carrera. Esto puede tardar unos segundos...")
     try:
         # 1. Preparación de datos de vueltas (Implementando robustez de datos)
         laps = session.laps.reset_index(drop=True)
