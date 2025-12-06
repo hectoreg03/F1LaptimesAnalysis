@@ -353,57 +353,72 @@ def get_driver_weekend_laptimes(current_session, driver):
 def get_race_replay(session):
     """
     Calcula el progreso de los pilotos y crea una gráfica de barras animada Plotly.
+    Corrige el posicionamiento al finalizar la carrera usando el tiempo de llegada.
     """
     try:
-        # 1. Preparación de datos de vueltas (Implementando robustez de datos)
+        # 1. Preparación de datos de vueltas
         laps = session.laps.reset_index(drop=True)
 
-        # Filtro 1: Solo vueltas con datos esenciales de tiempo y número de vuelta
+        # Filtro: Solo vueltas con datos esenciales
         laps = laps.dropna(subset=['Time', 'LapNumber', 'LapTime'])
         
-        # Convertir los objetos timedelta a segundos totales para el cálculo
+        # Convertir timedelta a segundos
         laps['EndTime'] = laps['Time'].dt.total_seconds()
         laps['Duration'] = laps['LapTime'].dt.total_seconds()
         laps['StartTime'] = laps['EndTime'] - laps['Duration']
         
-        # Filtro 2: Vueltas con duración válida (mayor a cero)
+        # Filtro: Vueltas válidas
         laps = laps[laps['Duration'] > 0] 
         
-        # Obtener la lista de pilotos SÓLO de las vueltas válidas y limpias
         valid_drivers = pd.unique(laps['Driver'])
 
-        # Validar si hay datos suficientes
         if laps.empty or len(valid_drivers) == 0:
-            st.warning("No se encontraron vueltas válidas después de la limpieza de datos o ningún piloto válido.")
+            st.warning("No se encontraron vueltas válidas.")
             return None
 
-        # 2. Generación de los 'frames' de la animación
+        # 2. Generación de frames
         start_t = laps['StartTime'].min()
         end_t = laps['EndTime'].max()
         
-        # Validar que los valores de tiempo sean números finitos.
         if not math.isfinite(start_t) or not math.isfinite(end_t) or end_t <= start_t:
-             st.warning("Los límites de tiempo no son válidos para crear la animación.")
+             st.warning("Límites de tiempo inválidos.")
              return None
              
-        # Reducimos n_frames a 50 para un rendimiento más rápido en Streamlit/Plotly
         n_frames = 50 
-        time_steps = np.linspace(start_t, end_t, n_frames)
+        time_steps = np.linspace(start_t, end_t + 60, n_frames) # Añadimos 60s al final para ver el podio estático
         team_map = laps.set_index('Driver')['Team'].to_dict()
 
         animation_rows = []
+        
+        # Diccionario para guardar el tiempo de finalización de cada piloto
+        finish_times = {}
+        for driver in valid_drivers:
+            d_laps = laps[laps['Driver'] == driver]
+            if not d_laps.empty:
+                finish_times[driver] = d_laps['EndTime'].max()
+            else:
+                finish_times[driver] = float('inf')
+
         for t in time_steps:
             drivers_in_frame = []
             for driver in valid_drivers:
                 d_laps = laps[laps['Driver'] == driver]
                 if d_laps.empty: continue
 
-                # Calcula el progreso (número de vuelta + fracción de la vuelta actual)
-                if t >= d_laps['EndTime'].max():
+                # Lógica de Progreso y Desempate
+                driver_finish_time = finish_times[driver]
+
+                if t >= driver_finish_time:
+                    # CASO 1: Carrera terminada para este piloto
                     prog = float(d_laps['LapNumber'].max())
+                    # El desempate es su tiempo REAL de llegada, no el tiempo de la animación 't'
+                    tie_breaker = driver_finish_time 
                 elif t <= d_laps['StartTime'].min():
+                    # CASO 2: No ha empezado
                     prog = 0.0
+                    tie_breaker = float('inf')
                 else:
+                    # CASO 3: En carrera (interpolación)
                     curr = d_laps[(d_laps['StartTime'] <= t) & (d_laps['EndTime'] >= t)]
                     if not curr.empty:
                         r = curr.iloc[0]
@@ -412,14 +427,37 @@ def get_race_replay(session):
                     else:
                         past = d_laps[d_laps['EndTime'] < t]
                         prog = float(past['LapNumber'].max()) if not past.empty else 0.0
+                    
+                    # Mientras corren, el desempate es 't', pero para evitar conflictos exactos,
+                    # confiamos en la pequeña variación del 'prog'.
+                    tie_breaker = t 
 
-                drivers_in_frame.append({'TimeIndex': t, 'Driver': driver, 'Progress': prog, 'Team': team_map.get(driver, 'Unknown')})
+                drivers_in_frame.append({
+                    'TimeIndex': t, 
+                    'Driver': driver, 
+                    'Progress': prog, 
+                    'Team': team_map.get(driver, 'Unknown'),
+                    'TieBreaker': tie_breaker # <--- Nuevo campo clave
+                })
 
             if drivers_in_frame:
-                # Ordena y asigna el ranking
-                drivers_in_frame.sort(key=lambda x: x['Progress'], reverse=True)
+                # ORDENAMIENTO CRÍTICO:
+                # 1. Mayor Progreso (Reverse=True)
+                # 2. Menor Tiempo (Reverse=True con negativo) -> El que llegó antes gana.
+                # Explicación: Queremos (Progreso: Alto, Tiempo: Bajo).
+                # Usando reverse=True: ordenamos por (Progreso, -TieBreaker).
+                # Ejemplo: 
+                # Piloto A: Prog 57, Tiempo 5000 -> (57, -5000)
+                # Piloto B: Prog 57, Tiempo 5100 -> (57, -5100)
+                # -5000 es mayor que -5100, así que A queda primero.
+                
+                drivers_in_frame.sort(key=lambda x: (x['Progress'], -x['TieBreaker']), reverse=True)
+                
                 for rank, row in enumerate(drivers_in_frame, 1):
                     row['Rank'] = rank
+                    # Actualizamos el texto para mostrar la posición explícita
+                    row['Label'] = f"P{rank} {row['Driver']}"
+                
                 animation_rows.extend(drivers_in_frame)
 
         if not animation_rows: 
@@ -432,13 +470,18 @@ def get_race_replay(session):
 
         # 3. Creación de la figura Plotly
         fig = px.bar(
-            df_anim, x="Progress", y="Rank", animation_frame="TimeIndex", animation_group="Driver",
-            orientation='h', text="Driver", color="Team", color_discrete_map=color_map,
-            # Aseguramos el rango x basado en las vueltas máximas
-            range_x=[0, laps['LapNumber'].max() + 0.5], 
-            # Invertimos el eje y
+            df_anim, 
+            x="Progress", 
+            y="Rank", 
+            animation_frame="TimeIndex", 
+            animation_group="Driver",
+            orientation='h', 
+            text="Label", # Usamos el nuevo label con la posición
+            color="Team", 
+            color_discrete_map=color_map,
+            range_x=[0, laps['LapNumber'].max() + 1.5], # Un poco más de espacio
             range_y=[20.5, 0.5], 
-            height=800 # Aumentamos un poco la altura para Streamlit
+            height=800
         )
 
         # 4. Configuración del diseño
@@ -447,22 +490,20 @@ def get_race_replay(session):
             plot_bgcolor=F1_BG,
             paper_bgcolor=F1_BG,
             font=dict(color='white', family="Arial", size=14),
-            xaxis=dict(title="Vueltas Completadas (Progreso)", gridcolor='#333', showgrid=True),
-            # Invertir el eje Y para que la posición 1 esté arriba
+            xaxis=dict(title="Vueltas Completadas", gridcolor='#333', showgrid=True),
             yaxis=dict(title="Posición", autorange="reversed", showgrid=False, tickvals=list(range(1, 21))), 
             showlegend=False,
-            # Margen izquierdo aumentado para el label "Posición"
             margin=dict(l=70, r=20, t=80, b=50) 
         )
         
-        # Ajustar la velocidad y ocultar sliders (mejora estética en Streamlit)
+        # Ajuste de velocidad
         fig.layout.updatemenus[0].buttons[0].args[1]["frame"]["duration"] = 50 
         fig.update_layout(sliders=[dict(visible=False)])
         
         return fig
         
     except Exception as e:
-        st.error(f"Error al generar la gráfica. Detalle: {e}")
+        st.error(f"Error al generar la gráfica: {e}")
         return None
 
 def get_weather_chart(session):
