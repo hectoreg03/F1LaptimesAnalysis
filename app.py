@@ -300,10 +300,11 @@ elif page == "🏁 Telemetry Dashboard":
         with tab5:
             if session_key == 'R':
                 st.markdown("#### RACE REPLAY")
-                if st.button("LAUNCH REPLAY"):
-                    with st.spinner("Rendering animation..."):
-                        fig = f1.get_race_replay(session)
-                        if fig: st.plotly_chart(fig, use_container_width=True)
+                with st.spinner("Rendering animation..."):
+                    fig = f1.get_race_replay(session)
+                
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True)        
             else:
                 st.warning("Replay available for Race sessions only.")
 
